@@ -22,11 +22,14 @@ jobs:
 
       - name: Build
         run: |
+          VERSION=${GITHUB_REF_NAME#v}
           xcodebuild -project Tea.xcodeproj \
             -scheme Tea \
             -configuration Release \
             -destination 'platform=macOS' \
             -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             build
 
       - name: Package
