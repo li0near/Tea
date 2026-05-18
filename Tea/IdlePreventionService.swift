@@ -1,10 +1,14 @@
 import Foundation
+import IOKit.pwr_mgt
 
 @MainActor
 final class IdlePreventionService {
     private var activityToken: NSObjectProtocol?
+    private var userActivityAssertionID: IOPMAssertionID = IOPMAssertionID(0)
     private var isRunning = false
     private var lockTask: Task<Void, Never>?
+    private var unlockTask: Task<Void, Never>?
+    private var heartbeatTask: Task<Void, Never>?
 
     var pauseWhenLocked = false {
         didSet {
@@ -20,14 +24,13 @@ final class IdlePreventionService {
 
     private var isPausedForLock = false
 
-    private var unlockTask: Task<Void, Never>?
-
     func start() {
         guard !isRunning else { return }
         isRunning = true
         isPausedForLock = false
 
         beginActivity()
+        startHeartbeat()
         observeScreenLock()
     }
 
@@ -36,6 +39,8 @@ final class IdlePreventionService {
         isRunning = false
         isPausedForLock = false
         endActivity()
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
         lockTask?.cancel()
         lockTask = nil
         unlockTask?.cancel()
@@ -48,6 +53,7 @@ final class IdlePreventionService {
             options: [.userInitiated, .idleDisplaySleepDisabled],
             reason: "Tea is preventing idle sleep"
         )
+        declareUserActivity()
     }
 
     private func endActivity() {
@@ -57,15 +63,33 @@ final class IdlePreventionService {
         }
     }
 
+    private func declareUserActivity() {
+        IOPMAssertionDeclareUserActivity(
+            "Tea User Activity" as CFString,
+            kIOPMUserActiveLocal,
+            &userActivityAssertionID
+        )
+    }
+
+    private func startHeartbeat() {
+        heartbeatTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                guard !Task.isCancelled, self.isRunning, self.activityToken != nil else { continue }
+                self.declareUserActivity()
+            }
+        }
+    }
+
     private func observeScreenLock() {
         lockTask = Task {
             for await _ in DistributedNotificationCenter.default().notifications(named: NSNotification.Name("com.apple.screenIsLocked")) {
-                await handleScreenLocked()
+                self.handleScreenLocked()
             }
         }
         unlockTask = Task {
             for await _ in DistributedNotificationCenter.default().notifications(named: NSNotification.Name("com.apple.screenIsUnlocked")) {
-                await handleScreenUnlocked()
+                self.handleScreenUnlocked()
             }
         }
     }
