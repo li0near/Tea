@@ -12,14 +12,14 @@ struct TeaApp: App {
             Image(systemName: appState.menuBarIcon)
         }
 
-        Window("Tea Settings", id: "settings") {
+        Window("Tea Settings", id: WindowID.settings) {
             SettingsView()
                 .environment(appState)
         }
         .windowResizability(.contentSize)
         .defaultPosition(.center)
 
-        Window("Quit Tea", id: "quit") {
+        Window("Quit Tea (v\(Bundle.main.shortVersion))", id: WindowID.quit) {
             QuitView()
                 .environment(appState)
         }

@@ -5,6 +5,8 @@ struct SettingsView: View {
     @Environment(AppState.self) private var appState
 
     var body: some View {
+        @Bindable var appState = appState
+
         VStack(spacing: 12) {
             HStack(spacing: 8) {
                 Text("Shortcut")
@@ -14,17 +16,11 @@ struct SettingsView: View {
 
             Divider()
 
-            Toggle("Pause when screen is locked", isOn: Binding(
-                get: { appState.pauseWhenLocked },
-                set: { appState.pauseWhenLocked = $0 }
-            ))
-            .toggleStyle(.checkbox)
+            Toggle("Pause when screen is locked", isOn: $appState.pauseWhenLocked)
+                .toggleStyle(.checkbox)
 
-            Toggle("Launch at Login", isOn: Binding(
-                get: { appState.launchAtLogin },
-                set: { appState.launchAtLogin = $0 }
-            ))
-            .toggleStyle(.checkbox)
+            Toggle("Launch at Login", isOn: $appState.launchAtLogin)
+                .toggleStyle(.checkbox)
         }
         .padding(16)
         .frame(width: 260)

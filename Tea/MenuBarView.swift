@@ -5,16 +5,15 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Toggle("Enabled", isOn: Binding(
-            get: { appState.isActive },
-            set: { _ in appState.toggle() }
-        ))
-        .keyboardShortcut("k", modifiers: [.command])
+        @Bindable var appState = appState
+
+        Toggle("Enabled", isOn: $appState.isActive)
+            .keyboardShortcut("k", modifiers: [.command])
 
         Divider()
 
         Button("Settings...") {
-            openWindow(id: "settings")
+            openWindow(id: WindowID.settings)
             NSApp.activate(ignoringOtherApps: true)
         }
         .keyboardShortcut(",", modifiers: [.command])
@@ -27,7 +26,7 @@ struct MenuBarView: View {
         }
 
         Button("Quit Tea...") {
-            openWindow(id: "quit")
+            openWindow(id: WindowID.quit)
             NSApp.activate(ignoringOtherApps: true)
         }
         .keyboardShortcut("q", modifiers: [.command])

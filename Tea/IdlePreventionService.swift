@@ -1,10 +1,9 @@
 import Foundation
-import IOKit.pwr_mgt
+import CoreGraphics
 
 @MainActor
 final class IdlePreventionService {
     private var activityToken: NSObjectProtocol?
-    private var userActivityAssertionID: IOPMAssertionID = IOPMAssertionID(0)
     private var isRunning = false
     private var lockTask: Task<Void, Never>?
     private var unlockTask: Task<Void, Never>?
@@ -50,10 +49,10 @@ final class IdlePreventionService {
     private func beginActivity() {
         guard activityToken == nil else { return }
         activityToken = ProcessInfo.processInfo.beginActivity(
-            options: [.userInitiated, .idleDisplaySleepDisabled],
-            reason: "Tea is preventing idle sleep"
+            options: .userInitiated,
+            reason: "Tea heartbeat"
         )
-        declareUserActivity()
+        postSyntheticMouseEvent()
     }
 
     private func endActivity() {
@@ -63,20 +62,12 @@ final class IdlePreventionService {
         }
     }
 
-    private func declareUserActivity() {
-        IOPMAssertionDeclareUserActivity(
-            "Tea User Activity" as CFString,
-            kIOPMUserActiveLocal,
-            &userActivityAssertionID
-        )
-    }
-
     private func startHeartbeat() {
         heartbeatTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(30))
+                try? await Task.sleep(for: .seconds(60))
                 guard !Task.isCancelled, self.isRunning, self.activityToken != nil else { continue }
-                self.declareUserActivity()
+                self.postSyntheticMouseEvent()
             }
         }
     }
@@ -104,5 +95,11 @@ final class IdlePreventionService {
         guard isRunning else { return }
         isPausedForLock = false
         beginActivity()
+    }
+
+    private func postSyntheticMouseEvent() {
+        let pos = CGEvent(source: nil)?.location ?? .zero
+        guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: pos, mouseButton: .left) else { return }
+        event.post(tap: .cghidEventTap)
     }
 }

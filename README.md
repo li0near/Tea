@@ -8,10 +8,11 @@ Tea uses macOS power assertions to keep your system awake — no mouse jiggling,
 
 - **One-click toggle** — enable/disable from the menu bar
 - **Global keyboard shortcut** — configurable hotkey to toggle from any app
+- **Teams/Slack compatible** — keeps you "Available" in apps that check idle time
 - **Timed quit** — automatically quit after a set duration (seconds, minutes, or hours)
 - **Screen lock awareness** — optionally pause when the screen is locked
 - **Launch at Login** — start automatically with your Mac
-- **Minimal footprint** — no Dock icon, no background polling, single power assertion
+- **Minimal footprint** — no Dock icon, no visible cursor movement
 
 ## Requirements
 
@@ -78,28 +79,25 @@ Click **Quit Tea...** → enable "Quit after a delay" → set duration and unit 
 
 ## How it works
 
-Tea calls `ProcessInfo.beginActivity(options: [.userInitiated, .idleDisplaySleepDisabled])`, which tells macOS the user is active. This is the same mechanism used by apps like Keynote during presentations.
+Tea posts a synthetic mouse-moved event (at the current cursor position) every 60 seconds. This resets the system idle timer, preventing display sleep and keeping apps like Microsoft Teams from marking you as away.
 
-Unlike mouse-jiggling utilities, Tea:
-- Does not move your cursor
-- Does not require Accessibility permissions
-- Does not generate synthetic input events
-- Uses zero C/IOKit APIs — pure Swift
+Additionally, `ProcessInfo.beginActivity(.userInitiated)` prevents macOS from App Napping the process.
+
+Unlike traditional mouse-jiggling utilities, Tea:
+- Does not visibly move your cursor
+- Does not generate keyboard events
 - Works reliably on macOS 15+ and macOS 26
+- Requires Accessibility permission (for posting HID events)
 
 ## Verification
 
-You can verify Tea is working by running:
+You can verify Tea is working by checking the system idle time resets:
 
 ```bash
-pmset -g assertions | grep Tea
+ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print $NF/1000000000; exit}'
 ```
 
-When enabled, you'll see:
-
-```
-pid XXXX(Tea): PreventUserIdleDisplaySleep named: "Tea is preventing idle sleep"
-```
+With Tea enabled, this value should never exceed ~60 seconds.
 
 ## License
 

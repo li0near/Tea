@@ -2,8 +2,25 @@ import SwiftUI
 import KeyboardShortcuts
 import ServiceManagement
 
+extension Bundle {
+    var shortVersion: String {
+        infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+}
+
 extension KeyboardShortcuts.Name {
     static let toggleTea = Self("toggleTea")
+}
+
+enum WindowID {
+    static let settings = "settings"
+    static let quit = "quit"
+}
+
+private enum DefaultsKey {
+    static let isActive = "isActive"
+    static let launchAtLogin = "launchAtLogin"
+    static let pauseWhenLocked = "pauseWhenLocked"
 }
 
 enum TimeUnit: String, CaseIterable, Identifiable {
@@ -12,14 +29,6 @@ enum TimeUnit: String, CaseIterable, Identifiable {
     case hours = "hours"
 
     var id: String { rawValue }
-
-    var abbreviation: String {
-        switch self {
-        case .seconds: "sec"
-        case .minutes: "min"
-        case .hours: "hr"
-        }
-    }
 
     func toSeconds(_ value: Int) -> Int {
         switch self {
@@ -35,7 +44,7 @@ enum TimeUnit: String, CaseIterable, Identifiable {
 final class AppState {
     var isActive: Bool {
         didSet {
-            UserDefaults.standard.set(isActive, forKey: "isActive")
+            UserDefaults.standard.set(isActive, forKey: DefaultsKey.isActive)
             if isActive {
                 idleService.start()
             } else {
@@ -48,14 +57,14 @@ final class AppState {
 
     var launchAtLogin: Bool {
         didSet {
-            UserDefaults.standard.set(launchAtLogin, forKey: "launchAtLogin")
+            UserDefaults.standard.set(launchAtLogin, forKey: DefaultsKey.launchAtLogin)
             updateLoginItem()
         }
     }
 
     var pauseWhenLocked: Bool {
         didSet {
-            UserDefaults.standard.set(pauseWhenLocked, forKey: "pauseWhenLocked")
+            UserDefaults.standard.set(pauseWhenLocked, forKey: DefaultsKey.pauseWhenLocked)
             idleService.pauseWhenLocked = pauseWhenLocked
         }
     }
@@ -88,14 +97,14 @@ final class AppState {
     init() {
         let defaults = UserDefaults.standard
         defaults.register(defaults: [
-            "isActive": false,
-            "launchAtLogin": false,
-            "pauseWhenLocked": true,
+            DefaultsKey.isActive: false,
+            DefaultsKey.launchAtLogin: false,
+            DefaultsKey.pauseWhenLocked: true,
         ])
 
-        self.isActive = defaults.bool(forKey: "isActive")
-        self.launchAtLogin = defaults.bool(forKey: "launchAtLogin")
-        self.pauseWhenLocked = defaults.bool(forKey: "pauseWhenLocked")
+        self.isActive = defaults.bool(forKey: DefaultsKey.isActive)
+        self.launchAtLogin = defaults.bool(forKey: DefaultsKey.launchAtLogin)
+        self.pauseWhenLocked = defaults.bool(forKey: DefaultsKey.pauseWhenLocked)
 
         idleService.pauseWhenLocked = pauseWhenLocked
 
@@ -125,7 +134,6 @@ final class AppState {
             isActive = true
         }
         timedQuitService.start(seconds: seconds)
-        timedQuitSecondsRemaining = seconds
     }
 
     func cancelTimedQuit() {
@@ -141,3 +149,4 @@ final class AppState {
         }
     }
 }
+

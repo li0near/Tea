@@ -26,7 +26,7 @@ struct QuitView: View {
                 HStack(spacing: 12) {
                     Button("Cancel Timer") {
                         appState.cancelTimedQuit()
-                        dismissWindow(id: "quit")
+                        dismissWindow(id: WindowID.quit)
                     }
                     .keyboardShortcut(.cancelAction)
 
@@ -45,7 +45,10 @@ struct QuitView: View {
 
                     if quitAfterEnabled {
                         HStack {
-                            TextField("", value: $quitAfterValue, format: .number)
+                            TextField("", value: Binding(
+                                get: { quitAfterValue },
+                                set: { quitAfterValue = max(1, $0) }
+                            ), format: .number)
                                 .frame(width: 50)
                                 .multilineTextAlignment(.center)
 
@@ -63,7 +66,7 @@ struct QuitView: View {
 
                 HStack(spacing: 12) {
                     Button("Cancel") {
-                        dismissWindow(id: "quit")
+                        dismissWindow(id: WindowID.quit)
                     }
                     .keyboardShortcut(.cancelAction)
 
@@ -71,7 +74,7 @@ struct QuitView: View {
                         Button("Start Timer") {
                             let totalSeconds = quitAfterUnit.toSeconds(max(1, quitAfterValue))
                             appState.startTimedQuit(seconds: totalSeconds)
-                            dismissWindow(id: "quit")
+                            dismissWindow(id: WindowID.quit)
                         }
                         .keyboardShortcut(.defaultAction)
                     } else {
