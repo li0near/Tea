@@ -13,6 +13,8 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -38,8 +40,23 @@ jobs:
           zip -r Tea.zip Tea.app
           mv Tea.zip "$GITHUB_WORKSPACE/"
 
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || echo "")
+          {
+            echo 'CHANGELOG<<EOF'
+            if [ -n "$PREV_TAG" ]; then
+              git log --pretty=format:'- %s' "${PREV_TAG}..${GITHUB_REF_NAME}"
+            else
+              git log --pretty=format:'- %s' "${GITHUB_REF_NAME}"
+            fi
+            echo
+            echo EOF
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: Tea.zip
-          generate_release_notes: true
+          body: ${{ steps.changelog.outputs.CHANGELOG }}
