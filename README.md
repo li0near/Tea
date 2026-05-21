@@ -2,13 +2,13 @@
 
 A lightweight macOS menu bar utility that prevents your Mac from going to sleep.
 
-Tea uses macOS power assertions to keep your system awake — no mouse jiggling, no accessibility permissions required.
+Tea holds macOS power assertions to keep your system awake and posts a tiny, idleness-gated synthetic mouse event so apps that key off system idle time stay aware that you're present.
 
 ## Features
 
 - **One-click toggle** — enable/disable from the menu bar
 - **Global keyboard shortcut** — configurable hotkey to toggle from any app
-- **Teams/Slack compatible** — keeps you "Available" in apps that check idle time
+- **Presence-aware** — keeps you "Available" in apps that check system idle time
 - **Timed quit** — automatically quit after a set duration (seconds, minutes, or hours)
 - **Screen lock awareness** — optionally pause when the screen is locked
 - **Launch at Login** — start automatically with your Mac
@@ -79,13 +79,14 @@ Click **Quit Tea...** → enable "Quit after a delay" → set duration and unit 
 
 ## How it works
 
-Tea posts a synthetic mouse-moved event (at the current cursor position) every 60 seconds. This resets the system idle timer, preventing display sleep and keeping apps like Microsoft Teams from marking you as away.
+Tea posts a tiny synthetic mouse-moved event at jittered intervals (30–60 seconds), gated on real user idleness. This resets the system idle timer, preventing display sleep and keeping presence-aware apps from marking you as away. The nudge is 1–3 pixels in a random direction on each axis — sub-perceptual at typical refresh rates.
 
-Additionally, `ProcessInfo.beginActivity(.userInitiated)` prevents macOS from App Napping the process.
+Additionally, `ProcessInfo.beginActivity(.userInitiated)` holds `PreventUserIdleDisplaySleep` and `PreventUserIdleSystemSleep` assertions, prevents App Nap, and keeps the heartbeat firing on time.
 
 Unlike traditional mouse-jiggling utilities, Tea:
-- Does not visibly move your cursor
+- Nudges the cursor by only 1–3 pixels in a random direction — imperceptible during use
 - Does not generate keyboard events
+- Skips the synthetic event entirely when you're actively using the machine
 - Works reliably on macOS 15+ and macOS 26
 - Requires Accessibility permission (for posting HID events)
 

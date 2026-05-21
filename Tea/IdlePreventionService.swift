@@ -1,9 +1,14 @@
 import Foundation
+import IOKit.pwr_mgt
 import CoreGraphics
+import ApplicationServices
 
 @MainActor
 final class IdlePreventionService {
+    private static let anyInputEventType = CGEventType(rawValue: 0xFFFFFFFF)!
+
     private var activityToken: NSObjectProtocol?
+    private var userActivityAssertionID: IOPMAssertionID = IOPMAssertionID(0)
     private var isRunning = false
     private var lockTask: Task<Void, Never>?
     private var unlockTask: Task<Void, Never>?
@@ -11,23 +16,16 @@ final class IdlePreventionService {
 
     var pauseWhenLocked = false {
         didSet {
-            guard isRunning else { return }
-            if pauseWhenLocked && isPausedForLock {
-                endActivity()
-            } else if !pauseWhenLocked && activityToken == nil {
-                isPausedForLock = false
-                beginActivity()
-            }
+            guard isRunning, !pauseWhenLocked, activityToken == nil else { return }
+            beginActivity()
         }
     }
-
-    private var isPausedForLock = false
 
     func start() {
         guard !isRunning else { return }
         isRunning = true
-        isPausedForLock = false
 
+        requestAccessibilityIfNeeded()
         beginActivity()
         startHeartbeat()
         observeScreenLock()
@@ -36,7 +34,6 @@ final class IdlePreventionService {
     func stop() {
         guard isRunning else { return }
         isRunning = false
-        isPausedForLock = false
         endActivity()
         heartbeatTask?.cancel()
         heartbeatTask = nil
@@ -49,10 +46,10 @@ final class IdlePreventionService {
     private func beginActivity() {
         guard activityToken == nil else { return }
         activityToken = ProcessInfo.processInfo.beginActivity(
-            options: .userInitiated,
+            options: [.userInitiated, .idleDisplaySleepDisabled, .idleSystemSleepDisabled],
             reason: "Tea heartbeat"
         )
-        postSyntheticMouseEvent()
+        tickle()
     }
 
     private func endActivity() {
@@ -62,24 +59,73 @@ final class IdlePreventionService {
         }
     }
 
+    private func tickle() {
+        declareUserActivity()
+        let idleSeconds = CGEventSource.secondsSinceLastEventType(
+            .combinedSessionState,
+            eventType: Self.anyInputEventType
+        )
+        guard idleSeconds >= 30 else { return }
+        postSyntheticMouseEvent()
+    }
+
+    private func declareUserActivity() {
+        IOPMAssertionDeclareUserActivity(
+            "Tea User Activity" as CFString,
+            kIOPMUserActiveLocal,
+            &userActivityAssertionID
+        )
+    }
+
+    private func postSyntheticMouseEvent() {
+        let source = CGEventSource(stateID: .hidSystemState)
+        let origin = CGEvent(source: source)?.location ?? .zero
+        let deltaX = Self.signedRandom(magnitudeIn: 1...3)
+        let deltaY = Self.signedRandom(magnitudeIn: 1...3)
+        let nudged = CGPoint(x: origin.x + Double(deltaX), y: origin.y + Double(deltaY))
+        guard let event = CGEvent(
+            mouseEventSource: source,
+            mouseType: .mouseMoved,
+            mouseCursorPosition: nudged,
+            mouseButton: .left
+        ) else { return }
+        event.post(tap: .cghidEventTap)
+    }
+
+    private static func signedRandom(magnitudeIn range: ClosedRange<Int>) -> Int {
+        let mag = Int.random(in: range)
+        return Bool.random() ? mag : -mag
+    }
+
+    private func requestAccessibilityIfNeeded() {
+        // String literal mirrors `kAXTrustedCheckOptionPrompt`; the bridged C
+        // constant imports as a non-isolated `var` and trips strict concurrency.
+        let options = ["AXTrustedCheckOptionPrompt" as CFString: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
     private func startHeartbeat() {
         heartbeatTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                let interval = Double.random(in: 30...60)
+                try? await Task.sleep(for: .seconds(interval))
                 guard !Task.isCancelled, self.isRunning, self.activityToken != nil else { continue }
-                self.postSyntheticMouseEvent()
+                self.tickle()
             }
         }
     }
 
     private func observeScreenLock() {
+        let center = DistributedNotificationCenter.default()
+        let lockedName = NSNotification.Name("com.apple.screenIsLocked")
+        let unlockedName = NSNotification.Name("com.apple.screenIsUnlocked")
         lockTask = Task {
-            for await _ in DistributedNotificationCenter.default().notifications(named: NSNotification.Name("com.apple.screenIsLocked")) {
+            for await _ in center.notifications(named: lockedName) {
                 self.handleScreenLocked()
             }
         }
         unlockTask = Task {
-            for await _ in DistributedNotificationCenter.default().notifications(named: NSNotification.Name("com.apple.screenIsUnlocked")) {
+            for await _ in center.notifications(named: unlockedName) {
                 self.handleScreenUnlocked()
             }
         }
@@ -87,19 +133,11 @@ final class IdlePreventionService {
 
     private func handleScreenLocked() {
         guard isRunning, pauseWhenLocked else { return }
-        isPausedForLock = true
         endActivity()
     }
 
     private func handleScreenUnlocked() {
         guard isRunning else { return }
-        isPausedForLock = false
         beginActivity()
-    }
-
-    private func postSyntheticMouseEvent() {
-        let pos = CGEvent(source: nil)?.location ?? .zero
-        guard let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: pos, mouseButton: .left) else { return }
-        event.post(tap: .cghidEventTap)
     }
 }

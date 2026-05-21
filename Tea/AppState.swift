@@ -24,9 +24,9 @@ private enum DefaultsKey {
 }
 
 enum TimeUnit: String, CaseIterable, Identifiable {
-    case seconds = "seconds"
-    case minutes = "minutes"
-    case hours = "hours"
+    case seconds
+    case minutes
+    case hours
 
     var id: String { rawValue }
 
@@ -79,15 +79,16 @@ final class AppState {
 
     var formattedRemaining: String {
         let total = max(0, timedQuitSecondsRemaining)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        if h > 0 {
-            return String(format: "%d:%02d:%02d", h, m, s)
-        } else if m > 0 {
-            return String(format: "%d:%02d", m, s)
+        guard total > 0 else { return "" }
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        let seconds = total % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        } else if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
         } else {
-            return "\(s)s"
+            return "\(seconds)s"
         }
     }
 
@@ -99,7 +100,7 @@ final class AppState {
         defaults.register(defaults: [
             DefaultsKey.isActive: false,
             DefaultsKey.launchAtLogin: false,
-            DefaultsKey.pauseWhenLocked: true,
+            DefaultsKey.pauseWhenLocked: true
         ])
 
         self.isActive = defaults.bool(forKey: DefaultsKey.isActive)
@@ -149,4 +150,3 @@ final class AppState {
         }
     }
 }
-
